@@ -64,7 +64,7 @@ function task2BQuery() {
             SEARCH_STUDENT_CONTACT=$(echo "$STUDENT_DATA" | cut -d':' -f3)
             SEARCH_STUDENT_MAIL=$(echo "$STUDENT_DATA" | cut -d':' -f4)
 
-        break
+            break
         fi
     done
 
@@ -173,7 +173,7 @@ function task3DQuery() {
             SEARCH_SERIAL=$(echo "$EQUIPMENT_DATA" | cut -d':' -f5)
             SEARCH_STATUS=$(echo "$EQUIPMENT_DATA" | cut -d':' -f6)
 
-        break
+            break
         fi
     done
 
@@ -328,7 +328,7 @@ function task4() {
             if [ "$STOCK_STATUS" = "On Loan" ]
             then
                 LOANER_FILE="${SEARCH_STUDENT_ID}.txt"
-                echo "${STOCK_MODEL}:${STOCK_DESCRIPTION}:${STOCK_LOAN_REASON}" >> "$LOANER_FILE"
+                echo "${STOCK_MODEL}:${STOCK_DESCRIPTION}:${STOCK_LOAN_REASON}:${STOCK_CODE}" >> "$LOANER_FILE"
                 task4UpdateData
             fi
             task4
@@ -338,7 +338,7 @@ function task4() {
             if [ "$STOCK_STATUS" = "On Loan" ]
             then
                 LOANER_FILE="${SEARCH_STUDENT_ID}.txt"
-                echo "${STOCK_MODEL}:${STOCK_DESCRIPTION}:${STOCK_LOAN_REASON}" >> "$LOANER_FILE"
+                echo "${STOCK_MODEL}:${STOCK_DESCRIPTION}:${STOCK_LOAN_REASON}:${STOCK_CODE}" >> "$LOANER_FILE"
                 task4UpdateData
             fi
             task4Receipt
@@ -411,6 +411,104 @@ function task4Receipt() {
     echo "Receipt ${RECEIPT_FILE} has been generated!"
 }
 
+function task5() {
+    while :
+    do
+        echo "Return Lab Equipment Form" | sed  -e :a -e "s/^.\{1,$(tput cols)\}$/ & /;ta" | tr -d '\n' | head -c $(tput cols)
+        printf '%.s─' $(seq 1 $(tput cols))
+
+        printf '\n\n'
+
+        read -p "Please enter the Student ID: " RETURN_STUDENT_ID
+        STUDENT_LOAN_FILE="${RETURN_STUDENT_ID}.txt"
+
+        if [ -f "${STUDENT_LOAN_FILE}" ];
+        then
+            break
+        else
+            echo "This Student Has Not Loan Any Lab Equipments! Please Try Again!"
+        fi
+    done
+
+    printf '\n\n'
+
+    echo 'Loan Items'
+    printf '%.s─' $(seq 1 11)
+
+    printf '\n'
+
+    echo 'No.                Code:                    Model:                    Description:                    Reason to Loan'
+    printf '%.s─' $(seq 1 130)
+
+    printf '\n'
+
+    unset IFS
+    IFS=$'\n'
+    NUMBER=0
+    for LOAN_DATA in $(cat "${STUDENT_LOAN_FILE}"); do
+        NUMBER=$(expr $NUMBER + 1)
+        LOAN_MODEL=$(echo "${LOAN_DATA}" | cut -d':' -f1)
+        LOAN_DESCRIPTION=$(echo "${LOAN_DATA}" | cut -d':' -f2)
+        LOAN_REASON=$(echo "${LOAN_DATA}" | cut -d':' -f3)
+        LOAN_CODE=$(echo "${LOAN_DATA}" | cut -d':' -f4)
+
+        echo "${NUMBER}                  ${LOAN_CODE}                    ${LOAN_MODEL}                     ${LOAN_DESCRIPTION}                        ${LOAN_REASON}"
+    done
+
+    printf '\n\n'
+
+    read -p "Please enter the Stock Code to return the Lab Equipment: " RETURN_STOCK_CODE
+
+    unset IFS
+    IFS=$'\n'
+    for LOAN_DATA in $(cat "${STUDENT_LOAN_FILE}"); do
+        CODE=$(echo "${LOAN_DATA}" | cut -d':' -f4)
+        if [ "${RETURN_STOCK_CODE}" != "${CODE}" ]
+        then
+            echo "$LOAN_DATA" >> temp_student_loan_file.txt
+        fi
+    done
+    rm "${STUDENT_LOAN_FILE}"
+    if [ -f temp_student_loan_file.txt ];
+    then
+        mv temp_student_loan_file.txt "${STUDENT_LOAN_FILE}"
+    fi
+
+    unset IFS
+    IFS=$'\n'
+    for EQUIPMENT_DATA in $(cat equipment.txt); do
+        CODE=$(echo "${EQUIPMENT_DATA}" | cut -d':' -f1)
+        if [ "${RETURN_STOCK_CODE}" = "${CODE}" ]
+        then
+            LOAN_MANUFACTURER=$(echo "${EQUIPMENT_DATA}" | cut -d':' -f2)
+            LOAN_SERIAL=$(echo "${EQUIPMENT_DATA}" | cut -d':' -f5)
+
+            echo "${RETURN_STOCK_CODE}:${LOAN_MANUFACTURER}:${LOAN_MODEL}:${LOAN_DESCRIPTION}:${LOAN_SERIAL}:Available" >> temp_equipment.txt
+        else
+            echo "$EQUIPMENT_DATA" >> temp_equipment.txt
+        fi
+    done
+    rm equipment.txt
+    mv temp_equipment.txt equipment.txt
+
+    echo "The Lab Equipment has been successfully returned!"
+    while :
+    do
+        read -p "Press ${BOLD}(n) ${NORMAL}to continue ${BOLD}Return Loan Equipment ${NORMAL}or ${BOLD}(q) to return to ${BOLD}Lab Equipment Management Menu: " READ_OPTION
+        if [ "$READ_OPTION" = "n" ]
+        then
+            task5
+            return 1
+        elif [ "$READ_OPTION" = "q" ]
+        then
+            task1
+            return 1
+        else
+            echo "Invalid Command! Please Try Again!"
+        fi
+    done
+}
+
 function task1() {
     echo "${BOLD}Lab Equipment${NORMAL} Management Menu"
     printf '%.s─' $(seq 1 30)
@@ -422,6 +520,7 @@ function task1() {
     echo "C - Add New Lab Equipment"
     echo "D - Search Lab Equipment"
     echo "E - Loan Lab Equipment"
+    echo "F - Return Lab Equipment"
     printf "\n"
     echo "Q - Exit From Program"
     read -p "Please select a choice: " CHOICE
@@ -441,6 +540,9 @@ function task1() {
     elif [ "$CHOICE" = "E" ]
     then
         task4
+    elif [ "$CHOICE" = "F" ]
+    then
+        task5
     elif [ "$CHOICE" = "Q" ]
     then
         echo "Exiting the Application!"
